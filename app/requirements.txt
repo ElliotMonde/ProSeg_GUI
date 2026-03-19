@@ -1,0 +1,6 @@
+fastapi[standard]
+pydicom
+numpy
+opencv-python-headless
+ultralytics
+python-multipart
