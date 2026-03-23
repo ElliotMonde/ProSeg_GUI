@@ -32,6 +32,8 @@ const Index = () => {
   const [showErrors, setShowErrors] = useState(true);
   const [rawFiles, setRawFiles] = useState<File[]>([]);
   const [viewMode, setViewMode] = useState<"2D" | "3D">("2D");
+  const [surfaceSmoothness, setSurfaceSmoothness] = useState(0);
+  const [sliceSpacingScale, setSliceSpacingScale] = useState(4);
   const [promptBoxes, setPromptBoxes] = useState<BoundingBoxPrompt[]>([]);
   const [activePromptClassId, setActivePromptClassId] = useState(SEGMENTATION_CLASSES[0].id);
   const [modelNames, setModelNames] = useState<string[]>([]);
@@ -105,6 +107,17 @@ const Index = () => {
     });
   }, []);
 
+  const markCurrentSliceAbsent = useCallback((classId: number) => {
+    handlePromptChange({
+      classId,
+      sliceIndex: currentSliceIdx,
+      x1: 0,
+      y1: 0,
+      x2: 1,
+      y2: 1,
+    });
+  }, [currentSliceIdx, handlePromptChange]);
+
   const clearCurrentPrompt = useCallback(() => {
     setPromptBoxes((prev) =>
       prev.filter(
@@ -127,6 +140,18 @@ const Index = () => {
   const currentMask = masks.find((m) => m.sliceIndex === currentSliceIdx);
   const currentSlicePrompts = promptBoxes.filter((prompt) => prompt.sliceIndex === currentSliceIdx);
   const activeClassName = classes.find((cls) => cls.id === activePromptClassId)?.name ?? "None";
+
+  const hasAbsentPrompt = useCallback((classId: number) => {
+    return promptBoxes.some(
+      (item) =>
+        item.classId === classId &&
+        item.sliceIndex === currentSliceIdx &&
+        item.x1 === 0 &&
+        item.y1 === 0 &&
+        item.x2 === 1 &&
+        item.y2 === 1,
+    );
+  }, [currentSliceIdx, promptBoxes]);
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -234,6 +259,8 @@ const Index = () => {
                     overlayOpacity={overlayOpacity}
                     imageOpacity={imageOpacity}
                     showErrors={showErrors}
+                    smoothness={surfaceSmoothness}
+                    sliceSpacingScale={sliceSpacingScale}
                   />
                 )}
               </div>
@@ -304,25 +331,38 @@ const Index = () => {
                 {classes.map((cls) => {
                   const active = cls.id === activePromptClassId;
                   const count = promptBoxes.filter((item) => item.classId === cls.id).length;
+                  const absent = hasAbsentPrompt(cls.id);
                   return (
-                    <button
-                      key={cls.id}
-                      onClick={() => setActivePromptClassId(cls.id)}
-                      className={`w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                        active
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border bg-background text-muted-foreground"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="inline-block h-3 w-3 rounded-full"
-                          style={{ backgroundColor: cls.color }}
-                        />
-                        {cls.name}
-                      </span>
-                      <span className="text-xs font-mono">{count}</span>
-                    </button>
+                    <div key={cls.id} className="flex gap-2">
+                      <button
+                        onClick={() => setActivePromptClassId(cls.id)}
+                        className={`flex-1 flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-3 w-3 rounded-full"
+                            style={{ backgroundColor: cls.color }}
+                          />
+                          {cls.name}
+                        </span>
+                        <span className="text-xs font-mono">{count}</span>
+                      </button>
+                      <button
+                        onClick={() => markCurrentSliceAbsent(cls.id)}
+                        className={`rounded-md border px-2 py-2 text-[11px] font-mono transition-colors ${
+                          absent
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-background text-muted-foreground hover:bg-secondary"
+                        }`}
+                        title="Mark this class as absent on the current slice"
+                      >
+                        Absent
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -345,6 +385,45 @@ const Index = () => {
                 </button>
               </div>
             </div>
+
+            {viewMode === "3D" && (
+              <div className="panel-section space-y-3">
+                <h3 className="text-xs font-mono font-semibold text-muted-foreground uppercase tracking-wider">
+                  Surface Mesh
+                </h3>
+                <div>
+                  <label className="text-xs font-mono text-muted-foreground block mb-2">
+                    Smoothness: {surfaceSmoothness}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="4"
+                    step="1"
+                    value={surfaceSmoothness}
+                    onChange={(e) => setSurfaceSmoothness(parseInt(e.target.value, 10))}
+                    className="w-full accent-primary h-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-muted-foreground block mb-2">
+                    Slice Spacing: {sliceSpacingScale.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="12"
+                    step="0.5"
+                    value={sliceSpacingScale}
+                    onChange={(e) => setSliceSpacingScale(parseFloat(e.target.value))}
+                    className="w-full accent-primary h-1"
+                  />
+                </div>
+                <p className="text-xs font-mono text-muted-foreground">
+                  0 keeps the raw surface. Higher values apply light mesh smoothing.
+                </p>
+              </div>
+            )}
 
             <ClassTogglePanel
               classes={classes}

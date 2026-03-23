@@ -352,9 +352,6 @@ def prompts_by_class(prompts: list[PromptBox], height: int, width: int) -> dict[
         class_id = int(prompt.classId)
         slice_index = int(prompt.sliceIndex)
         box = sanitize_box((prompt.x1, prompt.y1, prompt.x2, prompt.y2), h=height, w=width)
-        x1, y1, x2, y2 = box
-        if x2 <= x1 or y2 <= y1:
-            continue
         grouped.setdefault(class_id, {})[slice_index] = box
     return grouped
 

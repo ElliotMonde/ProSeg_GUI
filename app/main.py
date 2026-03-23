@@ -97,6 +97,8 @@ async def segment_dicoms(
         prompt_items: list[PromptBox] = parse_prompts(prompts)
         if not prompt_items:
             raise ValueError("At least one bbox prompt is required.")
+        print(f"/segment prompt count: {len(prompt_items)}")
+        print("/segment prompts:", [item.model_dump() for item in prompt_items])
 
         volume, _sorted_files = await load_sorted_volume_from_uploads(files)
         num_slices, height, width = volume.shape
@@ -118,6 +120,7 @@ async def segment_dicoms(
                 int(np.clip(slice_idx, 0, num_slices - 1)): box
                 for slice_idx, box in grouped_prompts[class_id].items()
             }
+            print(f"/segment class {class_id} prompts: {class_prompts}")
             key_slice_idx = sorted(class_prompts.keys())[0]
             class_mask = predict_mask_for_prompts(
                 model=model,
@@ -127,9 +130,11 @@ async def segment_dicoms(
                 norm_stats=norm_stats,
             )
             class_mask, _stats = postprocess_mask(class_mask, class_id)
+            print(f"/segment class {class_id} voxels after postprocess: {int(class_mask.sum())}")
             label_map[class_mask > 0] = int(class_id)
 
         masks = [_build_slice_payload(label_map, slice_index) for slice_index in range(num_slices)]
+        print("/segment total labeled voxels:", int((label_map > 0).sum()))
 
         return {
             "masks": masks,

@@ -8,6 +8,7 @@ export async function runInference(
   apiUrl: string = DEFAULT_API_URL,
   modelName?: string,
 ): Promise<PredictionResult> {
+  console.log("[runInference] sending prompts", prompts);
   const formData = new FormData();
   files.forEach((file) => {
     formData.append("files", file);
